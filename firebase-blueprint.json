@@ -1,0 +1,67 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User profile including verification and banking details.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "isVerified": { "type": "boolean" },
+        "payoutMethod": { "type": "string", "enum": ["CCI", "YAPE", "PLIN"] },
+        "payoutDetails": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "email", "isVerified"]
+    },
+    "Deal": {
+      "title": "Escrow Deal",
+      "description": "A transaction between a buyer and a seller.",
+      "type": "object",
+      "properties": {
+        "sellerId": { "type": "string" },
+        "buyerId": { "type": "string" },
+        "productName": { "type": "string" },
+        "productDescription": { "type": "string" },
+        "price": { "type": "number" },
+        "commission": { "type": "number" },
+        "commissionPayer": { "type": "string", "enum": ["seller", "buyer", "split"] },
+        "status": { "type": "string", "enum": ["PENDING_PAYMENT", "FUNDS_SECURED", "SHIPPED", "COMPLETED", "DISPUTED"] },
+        "paymentProofUrl": { "type": "string" },
+        "shippingProofUrl": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["sellerId", "productName", "price", "status"]
+    },
+    "Withdrawal": {
+      "title": "Withdrawal Request",
+      "description": "A request from a seller to transfer their funds.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "amount": { "type": "number" },
+        "method": { "type": "string", "enum": ["CCI", "YAPE", "PLIN"] },
+        "details": { "type": "string" },
+        "status": { "type": "string", "enum": ["PENDING", "COMPLETED"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "amount", "method", "details", "status"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Public and private user profiles."
+    },
+    "/deals/{dealId}": {
+      "schema": "Deal",
+      "description": "Escrow transactions."
+    },
+    "/withdrawals/{withdrawalId}": {
+      "schema": "Withdrawal",
+      "description": "Payout requests."
+    }
+  }
+}

@@ -1,0 +1,78 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Global helpers
+    function isSignedIn() { return request.auth != null; }
+    function isVerifiedUser() { return isSignedIn() && request.auth.token.email_verified == true; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+
+    function isAdmin() { return isSignedIn() && request.auth.token.email == 'jairo.virgo1996@gmail.com'; }
+
+    // User Rules
+    match /users/{userId} {
+      allow get: if isSignedIn();
+      allow list: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isSignedIn() && request.auth.uid == userId && isValidUser(incoming());
+      allow update: if isSignedIn() && request.auth.uid == userId && isValidUser(incoming()) && 
+                    incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'payoutMethod', 'payoutDetails', 'updatedAt']);
+    }
+
+    function isValidUser(data) {
+      return data.userId == request.auth.uid &&
+             data.email is string && data.email.size() <= 200 &&
+             data.isVerified is bool;
+    }
+
+    // Deal Rules
+    match /deals/{dealId} {
+      allow get: if true; 
+      allow list: if isAdmin() || (isSignedIn() && (resource.data.sellerId == request.auth.uid || resource.data.buyerId == request.auth.uid));
+      
+      allow create: if isVerifiedUser() && isValidDeal(incoming()) && incoming().sellerId == request.auth.uid;
+      
+      allow update: if isAdmin() || (isSignedIn() && isValidDeal(incoming()) && (
+        // Seller can update details (if pending)
+        (existing().sellerId == request.auth.uid && existing().status == 'PENDING_PAYMENT' && 
+         incoming().diff(existing()).affectedKeys().hasOnly(['productName', 'productDescription', 'price', 'commissionPayer'])) ||
+        
+        // Buyer can 'claim' a deal by paying
+        (existing().status == 'PENDING_PAYMENT' && (incoming().buyerId == request.auth.uid || isAdmin()) && 
+         incoming().status == 'FUNDS_SECURED' && 
+         incoming().diff(existing()).affectedKeys().hasOnly(['buyerId', 'status', 'updatedAt', 'paymentProofUrl'])) ||
+        
+        // Seller can mark as shipped
+        (existing().sellerId == request.auth.uid && existing().status == 'FUNDS_SECURED' && 
+         incoming().status == 'SHIPPED' && 
+         incoming().diff(existing()).affectedKeys().hasOnly(['status', 'shippingProofUrl', 'updatedAt'])) ||
+        
+        // Buyer can mark as received
+        (existing().buyerId == request.auth.uid && existing().status == 'SHIPPED' && 
+         incoming().status == 'COMPLETED' && 
+         incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']))
+      ));
+    }
+
+    function isValidDeal(data) {
+      return data.productName is string && data.productName.size() <= 200 &&
+             data.price is number && data.price > 0 &&
+             data.sellerId is string && isValidId(data.sellerId);
+    }
+
+    // Withdrawal Rules
+    match /withdrawals/{withdrawalId} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isSignedIn() && incoming().userId == request.auth.uid && 
+                    incoming().status == 'PENDING' && 
+                    incoming().method in ['CCI', 'YAPE', 'PLIN'] &&
+                    incoming().details is string;
+      allow update: if isAdmin();
+    }
+  }
+}

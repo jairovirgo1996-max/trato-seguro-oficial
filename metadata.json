@@ -1,0 +1,8 @@
+{
+  "name": "Trato Seguro",
+  "description": "Una plataforma de arbitraje imparcial que asegura tus compras y ventas por internet reteniendo los fondos hasta que el producto sea recibido conforme.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": []
+}
